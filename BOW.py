@@ -27,13 +27,13 @@ vectorizer = CountVectorizer()
 vectors = vectorizer.fit_transform(comments)    
     
 #split in train and test
-train= []
-test = []
-for x in vectors[:143615]:
-    train.append(y)
+#train= []
+#test = []
+#for x in vectors[:143615]:
+#    train.append(y)
 
-for x in vectors[143615:]:
-    test.append(y)
+#for x in vectors[143615:]:
+#    test.append(y)
 
 #Neural Network
 
