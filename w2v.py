@@ -9,7 +9,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn import svm
-from gensim.models import Word2Vec
+from gensim.models import Word2Vec, KeyedVectors
 
 
 class MeanEmbeddingVectorizer(object):
@@ -65,20 +65,24 @@ def main():
         content = f.readlines()
 
     data = pd.read_csv("jigsaw-toxic-comment-classification-challenge/train.csv")
-
+    print('Load data.')
 
     comments = []
     classes = []
-    for x in data.iloc:
+    for i in data.index:
+        x = data.iloc[i]
         comments.append(x[1])
         classes.append(''.join(map(str, (x[2], x[4], x[5], x[6], x[7]))))
 
+    print('Data ready.')
 
 
-    m_w2v = Word2Vec.load('/Users/willskywalker/Documents/Workplace/GoogleNews-vectors-negative300.bin.gz', binary=True)
+
+    m_w2v = KeyedVectors.load_word2vec_format('/Users/willskywalker/Documents/Workplace/GoogleNews-vectors-negative300.bin.gz', binary=True)
     w2v = dict(zip(m_w2v.wv.index2word, m_w2v.wv.vectors))
-    vectorizer = TfidfEmbeddingVectorizer()
+    vectorizer = TfidfEmbeddingVectorizer(w2v)
     vectors = vectorizer.fit_transform(comments)
+    print('Word2Vec model loaded.')
 
     #Define train and test sets (10% test)
     x_train = vectors[:143615]
