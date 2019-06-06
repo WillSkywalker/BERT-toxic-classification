@@ -5,9 +5,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from collections import defaultdict
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn import svm
 from gensim.models import Word2Vec, KeyedVectors
 
@@ -55,7 +56,7 @@ class TfidfEmbeddingVectorizer(object):
                 for words in X
             ])
 
-    def fit_transform(X):
+    def fit_transform(self, X):
         self.fit(X)
         return self.transform(X)
 
@@ -68,11 +69,11 @@ def main():
     print('Load data.')
 
     comments = []
-    classes = []
+    lab = []
     for i in data.index:
         x = data.iloc[i]
         comments.append(x[1])
-        classes.append(''.join(map(str, (x[2], x[4], x[5], x[6], x[7]))))
+        lab.append(''.join(map(str, (x[2], x[4], x[5], x[6], x[7]))))
 
     print('Data ready.')
 
