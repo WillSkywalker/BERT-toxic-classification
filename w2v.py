@@ -1,10 +1,6 @@
 import numpy as np
 import pandas as pd
 import re
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 from collections import defaultdict
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
@@ -62,10 +58,10 @@ class TfidfEmbeddingVectorizer(object):
 
 
 def main():
-    with open("jigsaw-toxic-comment-classification-challenge/train.csv") as f:
-        content = f.readlines()
+    # with open("train_processed.csv") as f:
+    #     content = f.readlines()
 
-    data = pd.read_csv("jigsaw-toxic-comment-classification-challenge/train.csv")
+    data = pd.read_csv("/home/s3612406/BERT-toxic-classification/train_preprocessed.csv")
     print('Load data.')
 
     comments = []
@@ -79,7 +75,7 @@ def main():
 
 
 
-    m_w2v = KeyedVectors.load_word2vec_format('/Users/willskywalker/Documents/Workplace/GoogleNews-vectors-negative300.bin.gz', binary=True)
+    m_w2v = KeyedVectors.load_word2vec_format('/home/s3612406/GoogleNews-vectors-negative300.bin.gz', binary=True)
     w2v = dict(zip(m_w2v.wv.index2word, m_w2v.wv.vectors))
     vectorizer = TfidfEmbeddingVectorizer(w2v)
     vectors = vectorizer.fit_transform(comments)
