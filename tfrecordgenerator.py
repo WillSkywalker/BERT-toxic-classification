@@ -175,9 +175,9 @@ def create_examples(df, labels_available=True):
         guid = row[0]
         text_a = row[1]
         if labels_available:
-            labels = row[2:]
+            labels = row[2:7]
         else:
-            labels = [0,0,0,0,0,0]
+            labels = [0,0,0,0,0]
         examples.append(
             InputExample(guid=guid, text_a=text_a, labels=labels))
     return examples

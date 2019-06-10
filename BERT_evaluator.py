@@ -16,29 +16,28 @@ import os
 #import modeling
 import logging
 
-
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 path = '/home/s3463699/Desktop/BERT-toxic-classification'
-BERT_VOCAB= os.path.join(path + '/data/toxic_comments/uncased_L-12_H-768_A-12/vocab.txt')
-BERT_INIT_CHKPNT = os.path.join(path + '/data/toxic_comments/uncased_L-12_H-768_A-12/bert_model.ckpt')
-BERT_CONFIG = os.path.join(path + '/data/toxic_comments/uncased_L-12_H-768_A-12/bert_config.json')
+BERT_VOCAB= os.path.join(path +'/data/toxic_comments/uncased_L-12_H-768_A-12/vocab.txt')
+BERT_INIT_CHKPNT = os.path.join(path +'/data/toxic_comments/uncased_L-12_H-768_A-12/bert_model.ckpt')
+BERT_CONFIG = os.path.join(path +'/data/toxic_comments/uncased_L-12_H-768_A-12/bert_config.json')
 
 tokenization.validate_case_matches_checkpoint(True,BERT_INIT_CHKPNT)
 tokenizer = tokenization.FullTokenizer(
       vocab_file=BERT_VOCAB, do_lower_case=True)
 
 
-train_data_path=os.path.join(path + '/data/toxic_comments/train.csv')
+train_data_path=os.path.join(path +'/data/toxic_comments/train.csv')
 train = pd.read_csv(train_data_path)
-test = pd.read_csv(os.path.join(path + '/data/toxic_comments/test.csv'))
+test = pd.read_csv(os.path.join(path +'/data/toxic_comments/test.csv'))
 
 
 ID = 'id'
 DATA_COLUMN = 'comment_text'
-LABEL_COLUMNS = ['insult','obscene','severe_toxic','threat','toxic']
+LABEL_COLUMNS = ['toxic','severe_toxic','obscene','threat','insult','identity_hate']
 
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
@@ -80,9 +79,9 @@ def create_examples(df, labels_available=True):
         guid = row[0]
         text_a = row[1]
         if labels_available:
-            labels = row[2:]
+            labels = row[2:7]
         else:
-            labels = [0,0,0,0,0,0]
+            labels = [0,0,0,0,0]
         examples.append(
             InputExample(guid=guid, text_a=text_a, labels=labels))
     return examples
@@ -123,7 +122,7 @@ def convert_examples_to_features(examples, max_seq_length, tokenizer):
 
     features = []
     for (ex_index, example) in enumerate(examples):
-        #print(example.text_a)
+        # print(example.text_a)
         tokens_a = tokenizer.tokenize(example.text_a)
 
         tokens_b = None
@@ -361,6 +360,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 MAX_SEQ_LENGTH = 128
 train_features = convert_examples_to_features( train_examples, MAX_SEQ_LENGTH, tokenizer)
 
+
 def input_fn_builder(features, seq_length, is_training, drop_remainder):
   """Creates an `input_fn` closure to be passed to TPUEstimator."""
 
@@ -556,7 +556,7 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
         "input_ids": tf.FixedLenFeature([seq_length], tf.int64),
         "input_mask": tf.FixedLenFeature([seq_length], tf.int64),
         "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
-        "label_ids": tf.FixedLenFeature([5], tf.int64),
+        "label_ids": tf.FixedLenFeature([6], tf.int64),
         "is_real_example": tf.FixedLenFeature([], tf.int64),
     }
 
@@ -610,7 +610,7 @@ WARMUP_PROPORTION = 0.1
 SAVE_CHECKPOINTS_STEPS = 1000
 SAVE_SUMMARY_STEPS = 500
 
-OUTPUT_DIR = os.path.join(path + '/output')
+OUTPUT_DIR = os.path.join(path +'/output')
 # Specify outpit directory and number of checkpoint steps to save
 run_config = tf.estimator.RunConfig(
     model_dir=OUTPUT_DIR,
@@ -618,30 +618,8 @@ run_config = tf.estimator.RunConfig(
     keep_checkpoint_max=1,
     save_checkpoints_steps=SAVE_CHECKPOINTS_STEPS)
 
-
-
-# train_input_fn = input_fn_builder( features=train_features, seq_length=MAX_SEQ_LENGTH, is_training=True, drop_remainder=False)
 num_train_steps = int(len(train_examples) / BATCH_SIZE * NUM_TRAIN_EPOCHS)
 num_warmup_steps = int(num_train_steps * WARMUP_PROPORTION)
-
-#from pathlib import Path
-train_file = os.path.join(OUTPUT_DIR, "train.tf_record")
-#filename = Path(train_file)
-if not os.path.exists(train_file):
-    open(train_file, 'w').close()
-# file_based_convert_examples_to_features(
-#             train_examples, MAX_SEQ_LENGTH, tokenizer, train_file)
-tf.logging.info("***** Running training *****")
-tf.logging.info("  Num examples = %d", len(train_examples))
-tf.logging.info("  Batch size = %d", BATCH_SIZE)
-tf.logging.info("  Num steps = %d", num_train_steps)
-
-train_input_fn = file_based_input_fn_builder(
-    input_file=train_file,
-    seq_length=MAX_SEQ_LENGTH,
-    is_training=True,
-    drop_remainder=True)
-
 bert_config = modeling.BertConfig.from_json_file(BERT_CONFIG)
 model_fn = model_fn_builder(
   bert_config=bert_config,
@@ -658,7 +636,29 @@ estimator = tf.estimator.Estimator(
   config=run_config,
   params={"batch_size": BATCH_SIZE})
 
-print(f'Beginning Training!')
-current_time = datetime.now()
-estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
-print("Training took time ", datetime.now() - current_time)
+eval_file = os.path.join(OUTPUT_DIR, "eval.tf_record")
+#filename = Path(train_file)
+if not os.path.exists(eval_file):
+    open(eval_file, 'w').close()
+
+eval_examples = create_examples(x_val)
+file_based_convert_examples_to_features(
+    eval_examples, MAX_SEQ_LENGTH, tokenizer, eval_file)
+
+eval_steps = None
+
+eval_drop_remainder = False
+eval_input_fn = file_based_input_fn_builder(
+    input_file=eval_file,
+    seq_length=MAX_SEQ_LENGTH,
+    is_training=False,
+    drop_remainder=False)
+
+result = estimator.evaluate(input_fn=eval_input_fn, steps=eval_steps)
+output_eval_file = os.path.join(OUTPUT_DIR, "eval_results.txt")
+with tf.gfile.GFile(output_eval_file, "w") as writer:
+    tf.logging.info("***** Eval results *****")
+    for key in sorted(result.keys()):
+        tf.logging.info("  %s = %s", key, str(result[key]))
+        writer.write("%s = %s\n" % (key, str(result[key])))
+
