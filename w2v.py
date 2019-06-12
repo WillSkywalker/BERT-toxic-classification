@@ -5,6 +5,7 @@ from collections import defaultdict
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 from sklearn import svm
 from gensim.models import Word2Vec, KeyedVectors
 
@@ -90,8 +91,10 @@ def main():
     #Train and test classifier
     clf = svm.SVC()
     clf.fit(x_train, y_train)
-    score = clf.score(x_test, y_test)
-    print ("Score:\n", score)
+    y_pred = clf.score(x_test, y_test)
+    print(confusion_matrix(y_test, y_pred))
+    print(classification_report(y_test, y_pred))
+
 
 
 if __name__ == '__main__':
