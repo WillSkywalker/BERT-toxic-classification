@@ -91,7 +91,7 @@ def main():
     #Train and test classifier
     clf = svm.SVC()
     clf.fit(x_train, y_train)
-    y_pred = clf.predict(x_test, y_test)
+    y_pred = clf.predict(x_test)
     print(confusion_matrix(y_test, y_pred))
     print(classification_report(y_test, y_pred))
 
