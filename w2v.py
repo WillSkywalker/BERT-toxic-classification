@@ -70,9 +70,10 @@ def main():
     for i in data.index:
         x = data.iloc[i]
         comments.append(x[1])
-        lab.append(''.join(map(str, (x[2], x[4], x[5], x[6], x[7]))))
+        lab.append(''.join(map(str, map(int, x[2], x[3], x[4], x[6], x[7]))))
 
     print('Data ready.')
+    print('Labels: ', str(len(set(lab))))
 
 
 
@@ -92,6 +93,33 @@ def main():
     clf = svm.SVC()
     clf.fit(x_train, y_train)
     y_pred = clf.predict(x_test)
+    y_proba = clf.predict_proba(x_test)
+    output = {'id': [],
+              'insult': [],
+              'obscene': [],
+              'severe_toxic': [],
+              'threat': [],
+              'toxic': [],
+              'toxicity': [],
+              'insult_pred': [],
+              'obscene_pred': [],
+              'severe_toxic_pred': [],
+              'threat_pred': [],
+              'toxic_pred': []}
+    for i in data.index:
+        x = data.iloc[i]
+        y = y_proba[i]
+        for col in x.columns:
+            output[col].append(x[col])
+        output['insult_pred'] = y[1]
+        output['obscene_pred'] = y[2]
+        output['severe_toxic_pred'] = y[3]
+        output['threat_pred'] = y[4]
+        output['toxic_pred'] = y[5]
+
+    out = pd.DataFrame(data=output)
+    out.to_csv('results/w2v.csv')
+
     print(confusion_matrix(y_test, y_pred))
     print(classification_report(y_test, y_pred))
 

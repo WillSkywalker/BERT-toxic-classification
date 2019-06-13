@@ -52,6 +52,10 @@ y_test = lab[143615:]
 
 #Train and test classifier
 clf = svm.SVC()
-clf.fit(x_train,y_train)
+clf.fit(x_train, y_train)
 score = clf.score(x_test, y_test)
 print ("Score:\n", score)
+
+y_pred = clf.predict(x_test)
+print(confusion_matrix(y_test, y_pred))
+print(classification_report(y_test, y_pred))
