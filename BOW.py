@@ -1,10 +1,4 @@
 import numpy as np
-import argparse
-import re
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.feature_extraction.text import CountVectorizer
