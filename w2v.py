@@ -90,7 +90,7 @@ def main():
     y_test = lab[143615:]
 
     #Train and test classifier
-    clf = svm.SVC()
+    clf = svm.SVC(probability=True)
     clf.fit(x_train, y_train)
     y_pred = clf.predict(x_test)
     y_proba = clf.predict_proba(x_test)
