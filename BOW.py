@@ -5,7 +5,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn import svm
 
 #Opening files
-file = open("/users/Jacqueline/Documents/Language_Technology_Project/train_preprocessed.csv")
+file = open("/home/s3612406/BERT-toxic-classification/train_preprocessed.csv")
 content = file.readlines()
 file.close()
 data = [line.split(",") for line in content] 
