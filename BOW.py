@@ -1,17 +1,11 @@
 import numpy as np
-import argparse
-import re
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn import svm
 
 #Opening files
-file = open("/users/Jacqueline/Documents/Language_Technology_Project/train_preprocessed.csv")
+file = open("/home/s3612406/BERT-toxic-classification/train_preprocessed.csv")
 content = file.readlines()
 file.close()
 data = [line.split(",") for line in content] 
@@ -52,6 +46,10 @@ y_test = lab[143615:]
 
 #Train and test classifier
 clf = svm.SVC()
-clf.fit(x_train,y_train)
+clf.fit(x_train, y_train)
 score = clf.score(x_test, y_test)
 print ("Score:\n", score)
+
+y_pred = clf.predict(x_test)
+print(confusion_matrix(y_test, y_pred))
+print(classification_report(y_test, y_pred))
