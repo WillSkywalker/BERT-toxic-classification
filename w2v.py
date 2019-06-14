@@ -70,7 +70,7 @@ def main():
     for i in data.index:
         x = data.iloc[i]
         comments.append(x[1])
-        lab.append(''.join(map(str, map(int, x[2], x[3], x[4], x[6], x[7]))))
+        lab.append(''.join(map(str, map(int, (x[2], x[3], x[4], x[6], x[7])))))
 
     print('Data ready.')
     print('Labels: ', str(len(set(lab))))
