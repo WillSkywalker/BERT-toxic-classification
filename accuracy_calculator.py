@@ -27,6 +27,7 @@ plt.yticks(np.arange(8)+0.5,lab_order,va="center",fontsize="20")
 plt.xticks(np.arange(8)+0.5,lab_order,va="center",fontsize="20")
 plt.ylabel("Gold Standard",fontsize="20")
 plt.xlabel("Predictions",fontsize="20")
+plt.savefig('/home/arjun/PycharmProjects/BERT-toxic-classification/results/confusion_mat.png')
 plt.show()
 
 
