@@ -1,10 +1,7 @@
 import matplotlib
 matplotlib.use('Agg')
 import numpy as np
-import argparse
-import re
 import pandas as pd
-import scipy
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn import svm
 from sklearn.metrics import confusion_matrix
