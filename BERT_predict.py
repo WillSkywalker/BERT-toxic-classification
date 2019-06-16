@@ -617,4 +617,4 @@ def create_output(predictions):
 output_df = create_output(predictions)
 merged_df =  pd.concat([x_test, output_df], axis=1)
 submission = merged_df.drop(['comment_text'], axis=1)
-submission.to_csv("sample_submission.csv", index=False)
+submission.to_csv("results.csv", index=False)
