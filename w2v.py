@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
+import seaborn as sn
+import matplotlib.pyplot as plt
 import re
 from collections import defaultdict
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import OneHotEncoder
+from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, mean_absolute_error
 from sklearn import svm
 from gensim.models import Word2Vec, KeyedVectors
 
@@ -72,16 +73,22 @@ def main():
         x = data.iloc[i]
         comments.append(x[2])
         # lab.append(''.join(map(str, map(int, (x[2], x[3], x[4], x[6], x[7])))))
-        lab.append(x[9])
+        lab.append('%03d' % int(x[9]))
 
     print('Data ready.')
     print('Labels: ', str(len(set(lab))))
+    print(set(lab))
     length = int(len(comments) * 0.9)
 
 
+    #model_cbow = Word2Vec(comments, size=200, workers=14, sg=0, window=5)
+    #model_cbow.save('./model_cbow')
+    model_cbow = Word2Vec.load('./model_cbow')
 
-    m_w2v = KeyedVectors.load_word2vec_format('/Users/willskywalker/Documents/Workplace/GoogleNews-vectors-negative300.bin.gz', binary=True)
-    w2v = dict(zip(m_w2v.wv.index2word, m_w2v.wv.vectors))
+    #m_w2v = KeyedVectors.load_word2vec_format('/home/s3612406/GoogleNews-vectors-negative300.bin.gz', binary=True)
+    #m_w2v2 = KeyedVectors.load_word2vec_format('/home/s3612406/enwiki_20180420_300d.txt.bz2')
+    #w2v = dict(zip(model_cbow.wv.index2word, model_cbow.wv.vectors))
+    w2v = dict(zip(model_cbow.wv.index2word, model_cbow.wv.vectors))
     vectorizer = TfidfEmbeddingVectorizer(w2v)
     vectors = vectorizer.fit_transform(comments)
     print('Word2Vec model loaded.')
@@ -89,11 +96,16 @@ def main():
     #Define train and test sets (10% test)
     x_train, x_test, y_train, y_test = train_test_split(vectors, lab, test_size=0.1, random_state=0)
 
+    lb = preprocessing.LabelBinarizer()
+    lb.fit(y_train)
+
     #Train and test classifier
     clf = svm.SVC(probability=True)
     clf.fit(x_train, y_train)
     y_pred = clf.predict(x_test)
     y_proba = clf.predict_proba(x_test)
+    y_vec = lb.transform(y_test)
+    print('MAE:', mean_absolute_error(y_vec, y_proba))
     # output = {'id': [],
     #           'insult': [],
     #           'obscene': [],
@@ -123,6 +135,18 @@ def main():
     print(confusion_matrix(y_test, y_pred))
     print(classification_report(y_test, y_pred))
 
+    lab_order = ['000','001','010','011','100','101','110','111']
+    c_mat = confusion_matrix(y_test, y_pred, labels=lab_order)
+    print (c_mat)
+    sn.set()
+    fig, ax = plt.subplots(figsize=(15,10))
+    ax = sn.heatmap(c_mat, annot=True, vmax=np.mean(c_mat)+60,vmin=-20,fmt='g')
+    ax.set_title('Word2vec confusion matrix', fontsize=20, fontdict={})
+    plt.yticks(np.arange(8)+0.5,lab_order,va="center",fontsize="20")
+    plt.xticks(np.arange(8)+0.5,lab_order,va="center",fontsize="20")
+    plt.ylabel("Gold Standard",fontsize="20")
+    plt.xlabel("Predictions",fontsize="20")
+    plt.savefig('fig2.png')
 
 
 if __name__ == '__main__':
