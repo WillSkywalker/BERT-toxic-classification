@@ -1,23 +1,16 @@
 import collections
 
-from sklearn.model_selection import train_test_split
 import pandas as pd
 import tensorflow as tf
-import tensorflow_hub as hub
-from datetime import datetime
-import bert
-from bert import run_classifier, run_classifier_with_tfhub
-from bert import optimization
 from bert import tokenization
-from bert import modeling
 import os
 
 path = '/home/arjun/PycharmProjects/BERT-toxic-classification'
 OUTPUT_DIR = os.path.join(path +'/output')
-train_data_path=os.path.join(path + '/data/toxic_comments/train.csv')
+train_data_path=os.path.join(path + '/train.csv')
 print (train_data_path)
 train = pd.read_csv(train_data_path)
-test = pd.read_csv(os.path.join(path + '/data/toxic_comments/test.csv'))
+test = pd.read_csv(os.path.join(path + '/test.csv'))
 MAX_SEQ_LENGTH = 128
 
 BERT_VOCAB= os.path.join(path +'/data/toxic_comments/uncased_L-12_H-768_A-12/vocab.txt')
@@ -81,13 +74,8 @@ def convert_single_example(ex_index, example, max_seq_length,
                            tokenizer):
     """Converts a single `InputExample` into a single `InputFeatures`."""
 
-    # if isinstance(example, PaddingInputExample):
-    # return InputFeatures(
-    #     input_ids=[0] * max_seq_length,
-    #     input_mask=[0] * max_seq_length,
-    #     segment_ids=[0] * max_seq_length,
-    #     label_ids=0,
-    #     is_real_example=False)
+
+
 
     tokens_a = tokenizer.tokenize(example.text_a)
     tokens_b = None
@@ -104,24 +92,7 @@ def convert_single_example(ex_index, example, max_seq_length,
         if len(tokens_a) > max_seq_length - 2:
             tokens_a = tokens_a[0:(max_seq_length - 2)]
 
-    # The convention in BERT is:
-    # (a) For sequence pairs:
-    #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
-    #  type_ids: 0     0  0    0    0     0       0 0     1  1  1  1   1 1
-    # (b) For single sequences:
-    #  tokens:   [CLS] the dog is hairy . [SEP]
-    #  type_ids: 0     0   0   0  0     0 0
-    #
-    # Where "type_ids" are used to indicate whether this is the first
-    # sequence or the second sequence. The embedding vectors for `type=0` and
-    # `type=1` were learned during pre-training and are added to the wordpiece
-    # embedding vector (and position vector). This is not *strictly* necessary
-    # since the [SEP] token unambiguously separates the sequences, but it makes
-    # it easier for the model to learn the concept of sequences.
-    #
-    # For classification tasks, the first vector (corresponding to [CLS]) is
-    # used as the "sentence vector". Note that this only makes sense because
-    # the entire model is fine-tuned.
+
     tokens = []
     segment_ids = []
     tokens.append("[CLS]")
@@ -173,14 +144,18 @@ def create_examples(df, labels_available=True):
     examples = []
     for (i, row) in enumerate(df.values):
         guid = row[0]
+        print (guid)
         text_a = row[1]
+        print (text_a)
         if labels_available:
-            labels = row[2:7]
+            labels = row[2:5]
         else:
-            labels = [0,0,0,0,0]
+            labels = [0,0,0]
         examples.append(
             InputExample(guid=guid, text_a=text_a, labels=labels))
+    print (examples)
     return examples
+
 
 TRAIN_VAL_RATIO = 0.9
 LEN = train.shape[0]
