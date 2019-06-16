@@ -1,19 +1,11 @@
-import numpy as np # linear algebra
-import pandas as pd
-import os
 import collections
-
-from sklearn.model_selection import train_test_split
 import pandas as pd
 import tensorflow as tf
 from datetime import datetime
-import bert
 from bert import optimization
 from bert import tokenization
 from bert import modeling
 import os
-#import tokenization
-#import modeling
 import logging
 
 
@@ -38,7 +30,7 @@ test = pd.read_csv(os.path.join(path + '/data/toxic_comments/test.csv'))
 
 ID = 'id'
 DATA_COLUMN = 'comment_text'
-LABEL_COLUMNS = ['insult','obscene','severe_toxic','threat','toxic']
+LABEL_COLUMNS = ['toxic','obscene','insult']
 
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
@@ -80,12 +72,14 @@ def create_examples(df, labels_available=True):
         guid = row[0]
         text_a = row[1]
         if labels_available:
-            labels = row[2:]
+            labels = row[2:5]
         else:
-            labels = [0,0,0,0,0,0]
+            labels = [0,0,0]
         examples.append(
             InputExample(guid=guid, text_a=text_a, labels=labels))
     return examples
+
+
 
 
 TRAIN_VAL_RATIO = 0.9
@@ -129,33 +123,11 @@ def convert_examples_to_features(examples, max_seq_length, tokenizer):
         tokens_b = None
         if example.text_b:
             tokens_b = tokenizer.tokenize(example.text_b)
-            # Modifies `tokens_a` and `tokens_b` in place so that the total
-            # length is less than the specified length.
-            # Account for [CLS], [SEP], [SEP] with "- 3"
             _truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
         else:
-            # Account for [CLS] and [SEP] with "- 2"
             if len(tokens_a) > max_seq_length - 2:
                 tokens_a = tokens_a[:(max_seq_length - 2)]
 
-        # The convention in BERT is:
-        # (a) For sequence pairs:
-        #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
-        #  type_ids: 0   0  0    0    0     0       0 0    1  1  1  1   1 1
-        # (b) For single sequences:
-        #  tokens:   [CLS] the dog is hairy . [SEP]
-        #  type_ids: 0   0   0   0  0     0 0
-        #
-        # Where "type_ids" are used to indicate whether this is the first
-        # sequence or the second sequence. The embedding vectors for `type=0` and
-        # `type=1` were learned during pre-training and are added to the wordpiece
-        # embedding vector (and position vector). This is not *strictly* necessary
-        # since the [SEP] token unambigiously separates the sequences, but it makes
-        # it easier for the model to learn the concept of sequences.
-        #
-        # For classification tasks, the first vector (corresponding to [CLS]) is
-        # used as as the "sentence vector". Note that this only makes sense because
-        # the entire model is fine-tuned.
         tokens = ["[CLS]"] + tokens_a + ["[SEP]"]
         segment_ids = [0] * len(tokens)
 
@@ -213,11 +185,6 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
         token_type_ids=segment_ids,
         use_one_hot_embeddings=use_one_hot_embeddings)
 
-    # In the demo, we are doing a simple classification task on the entire
-    # segment.
-    #
-    # If you want to use the token-level output, use model.get_sequence_output()
-    # instead.
     output_layer = model.get_pooled_output()
 
     hidden_size = output_layer.shape[-1].value
@@ -237,22 +204,12 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
         logits = tf.matmul(output_layer, output_weights, transpose_b=True)
         logits = tf.nn.bias_add(logits, output_bias)
 
-        # probabilities = tf.nn.softmax(logits, axis=-1) ### multiclass case
         probabilities = tf.nn.sigmoid(logits)  #### multi-label case
 
         labels = tf.cast(labels, tf.float32)
         tf.logging.info("num_labels:{};logits:{};labels:{}".format(num_labels, logits, labels))
         per_example_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
         loss = tf.reduce_mean(per_example_loss)
-
-        # probabilities = tf.nn.softmax(logits, axis=-1)
-        # log_probs = tf.nn.log_softmax(logits, axis=-1)
-        #
-        # one_hot_labels = tf.one_hot(labels, depth=num_labels, dtype=tf.float32)
-        #
-        # per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)
-        # loss = tf.reduce_mean(per_example_loss)
-
         return (loss, per_example_loss, logits, probabilities)
 
 
@@ -261,12 +218,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                      use_one_hot_embeddings):
     """Returns `model_fn` closure for TPUEstimator."""
 
-    def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
-        """The `model_fn` for TPUEstimator."""
-
-        # tf.logging.info("*** Features ***")
-        # for name in sorted(features.keys()):
-        #    tf.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
+    def model_fn(features, labels, mode, params):
 
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
@@ -333,16 +285,6 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                 eval_dict['eval_loss'] = tf.metrics.mean(values=per_example_loss)
                 return eval_dict
 
-                ## original eval metrics
-                # predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
-                # accuracy = tf.metrics.accuracy(
-                #     labels=label_ids, predictions=predictions, weights=is_real_example)
-                # loss = tf.metrics.mean(values=per_example_loss, weights=is_real_example)
-                # return {
-                #     "eval_accuracy": accuracy,
-                #     "eval_loss": loss,
-                # }
-
             eval_metrics = metric_fn(per_example_loss, label_ids, probabilities, is_real_example)
             output_spec = tf.estimator.EstimatorSpec(
                 mode=mode,
@@ -362,7 +304,7 @@ MAX_SEQ_LENGTH = 128
 train_features = convert_examples_to_features( train_examples, MAX_SEQ_LENGTH, tokenizer)
 
 def input_fn_builder(features, seq_length, is_training, drop_remainder):
-  """Creates an `input_fn` closure to be passed to TPUEstimator."""
+
 
   all_input_ids = []
   all_input_mask = []
@@ -380,10 +322,6 @@ def input_fn_builder(features, seq_length, is_training, drop_remainder):
     batch_size = params["batch_size"]
 
     num_examples = len(features)
-
-    # This is for demo purposes and does NOT scale to large data sets. We do
-    # not use Dataset.from_generator() because that uses tf.py_func which is
-    # not TPU compatible. The right way to load data is with TFRecordReader.
     d = tf.data.Dataset.from_tensor_slices({
         "input_ids":
             tf.constant(
@@ -412,27 +350,9 @@ def input_fn_builder(features, seq_length, is_training, drop_remainder):
 
   return input_fn
 
-# class PaddingInputExample(object):
-#     """Fake example so the num input examples is a multiple of the batch size.
-#     When running eval/predict on the TPU, we need to pad the number of examples
-#     to be a multiple of the batch size, because the TPU requires a fixed batch
-#     size. The alternative is to drop the last batch, which is bad because it means
-#     the entire output data won't be generated.
-#     We use this class instead of `None` because treating `None` as padding
-#     battches could cause silent errors.
-#     """
-
 def convert_single_example(ex_index, example, max_seq_length,
                            tokenizer):
     """Converts a single `InputExample` into a single `InputFeatures`."""
-
-    # if isinstance(example, PaddingInputExample):
-    # return InputFeatures(
-    #     input_ids=[0] * max_seq_length,
-    #     input_mask=[0] * max_seq_length,
-    #     segment_ids=[0] * max_seq_length,
-    #     label_ids=0,
-    #     is_real_example=False)
 
     tokens_a = tokenizer.tokenize(example.text_a)
     tokens_b = None
@@ -440,33 +360,12 @@ def convert_single_example(ex_index, example, max_seq_length,
         tokens_b = tokenizer.tokenize(example.text_b)
 
     if tokens_b:
-        # Modifies `tokens_a` and `tokens_b` in place so that the total
-        # length is less than the specified length.
-        # Account for [CLS], [SEP], [SEP] with "- 3"
+
         _truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
     else:
         # Account for [CLS] and [SEP] with "- 2"
         if len(tokens_a) > max_seq_length - 2:
             tokens_a = tokens_a[0:(max_seq_length - 2)]
-
-    # The convention in BERT is:
-    # (a) For sequence pairs:
-    #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
-    #  type_ids: 0     0  0    0    0     0       0 0     1  1  1  1   1 1
-    # (b) For single sequences:
-    #  tokens:   [CLS] the dog is hairy . [SEP]
-    #  type_ids: 0     0   0   0  0     0 0
-    #
-    # Where "type_ids" are used to indicate whether this is the first
-    # sequence or the second sequence. The embedding vectors for `type=0` and
-    # `type=1` were learned during pre-training and are added to the wordpiece
-    # embedding vector (and position vector). This is not *strictly* necessary
-    # since the [SEP] token unambiguously separates the sequences, but it makes
-    # it easier for the model to learn the concept of sequences.
-    #
-    # For classification tasks, the first vector (corresponding to [CLS]) is
-    # used as the "sentence vector". Note that this only makes sense because
-    # the entire model is fine-tuned.
     tokens = []
     segment_ids = []
     tokens.append("[CLS]")
@@ -521,8 +420,7 @@ def file_based_convert_examples_to_features(
     writer = tf.python_io.TFRecordWriter(output_file)
 
     for (ex_index, example) in enumerate(examples):
-        #if ex_index % 10000 == 0:
-            #tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
+
 
         feature = convert_single_example(ex_index, example,
                                          max_seq_length, tokenizer)
@@ -556,7 +454,7 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
         "input_ids": tf.FixedLenFeature([seq_length], tf.int64),
         "input_mask": tf.FixedLenFeature([seq_length], tf.int64),
         "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
-        "label_ids": tf.FixedLenFeature([5], tf.int64),
+        "label_ids": tf.FixedLenFeature([3], tf.int64),
         "is_real_example": tf.FixedLenFeature([], tf.int64),
     }
 
@@ -564,8 +462,6 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
         """Decodes a record to a TensorFlow example."""
         example = tf.parse_single_example(record, name_to_features)
 
-        # tf.Example only supports tf.int64, but the TPU only supports tf.int32.
-        # So cast all int64 to int32.
         for name in list(example.keys()):
             t = example[name]
             if t.dtype == tf.int64:
@@ -578,8 +474,6 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
         """The actual input function."""
         batch_size = params["batch_size"]
 
-        # For training, we want a lot of parallel reading and shuffling.
-        # For eval, we want no shuffling and parallel reading doesn't matter.
         d = tf.data.TFRecordDataset(input_file)
         if is_training:
             d = d.repeat()
@@ -598,20 +492,18 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
 
 
 
-# Compute train and warmup steps from batch size
-# These hyperparameters are copied from this colab notebook (https://colab.sandbox.google.com/github/tensorflow/tpu/blob/master/tools/colab/bert_finetuning_with_cloud_tpus.ipynb)
+
 BATCH_SIZE = 32
 LEARNING_RATE = 2e-5
-NUM_TRAIN_EPOCHS = 2.0
-# Warmup is a period of time where hte learning rate
-# is small and gradually increases--usually helps training.
+NUM_TRAIN_EPOCHS = 3.0
+
 WARMUP_PROPORTION = 0.1
 # Model configs
 SAVE_CHECKPOINTS_STEPS = 1000
 SAVE_SUMMARY_STEPS = 500
 
 OUTPUT_DIR = os.path.join(path + '/output')
-# Specify outpit directory and number of checkpoint steps to save
+
 run_config = tf.estimator.RunConfig(
     model_dir=OUTPUT_DIR,
     save_summary_steps=SAVE_SUMMARY_STEPS,
@@ -620,7 +512,7 @@ run_config = tf.estimator.RunConfig(
 
 
 
-# train_input_fn = input_fn_builder( features=train_features, seq_length=MAX_SEQ_LENGTH, is_training=True, drop_remainder=False)
+
 num_train_steps = int(len(train_examples) / BATCH_SIZE * NUM_TRAIN_EPOCHS)
 num_warmup_steps = int(num_train_steps * WARMUP_PROPORTION)
 
@@ -629,8 +521,7 @@ train_file = os.path.join(OUTPUT_DIR, "train.tf_record")
 #filename = Path(train_file)
 if not os.path.exists(train_file):
     open(train_file, 'w').close()
-# file_based_convert_examples_to_features(
-#             train_examples, MAX_SEQ_LENGTH, tokenizer, train_file)
+
 tf.logging.info("***** Running training *****")
 tf.logging.info("  Num examples = %d", len(train_examples))
 tf.logging.info("  Batch size = %d", BATCH_SIZE)
