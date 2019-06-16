@@ -1,55 +1,54 @@
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import OneHotEncoder
+import argparse
+import re
+import pandas as pd
+import scipy
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn import svm
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import mean_absolute_error
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.metrics import classification_report
 
-#Opening files
-file = open("/home/s3612406/BERT-toxic-classification/train_preprocessed.csv")
-content = file.readlines()
-file.close()
-data = [line.split(",") for line in content] 
-#Delete the unnecessary columns
-for x in data:
-    del x[1]
-    del x[4]
-
-#Create an list with all the comments and with all the classes (labels)
-comments = []
-classes = []
-for x in data[1:]:
-    y = x[0]
-    z = x[1:]
-    comments.append(y)
-    classes.append(z)
-
-#Change the label representation to 'glued' numbers (from list of "0.0 0.0 etc." to "00etc."")
-new = ""
-lab = []
-for labels in classes:
-    for label in labels:
-        label = int(float(label))
-        label = str(label)
-        new = new + label
-    lab.append(new)
-    new = ""
+#Opening data file and removing unnecessary columns
+data = pd.read_csv("/home/s3843408/Desktop/kindabalanced.csv")
+data = data.drop(["severe_toxic","threat","identity_hate","label"],axis=1)
 
 #Vectorize the comments                
 vectorizer = CountVectorizer()
-vectors = vectorizer.fit_transform(comments)
+vectors = vectorizer.fit_transform(data.iloc[:,2])
+
+#Glue the values of the labels together (to create values like this: '000','100' etc.)
+labels = []
+for i in data.index:
+    x = data.iloc[i]
+    labels.append(''.join(map(str, map(int, (x[3], x[4], x[5])))))
+
 
 #Define train and test sets (10% test)
-x_train = vectors[:143615]
-x_test = vectors[143615:]
-y_train = lab[:143615]
-y_test = lab[143615:]
+x_train, x_test, y_train, y_test = train_test_split(vectors, labels, test_size = 0.1, random_state = 0)
 
-#Train and test classifier
-clf = svm.SVC()
-clf.fit(x_train, y_train)
-score = clf.score(x_test, y_test)
-print ("Score:\n", score)
+#Transform the y_test (test labels) values to a dimension of 8 (all possible combinations of the three labels),
+#so it matches the dimension of the predicted probability labels  
+mlb = MultiLabelBinarizer()
+myarray = np.asarray(y_test)
+y_test_new = mlb.fit_transform(myarray.reshape(-1,1))
 
+#Train classifier
+clf = svm.SVC(probability=True)
+clf.fit(x_train,y_train)
+
+#Predict labels from the test set (also probabilities for labels)
 y_pred = clf.predict(x_test)
-print(confusion_matrix(y_test, y_pred))
+y_pred_prob = clf.predict_proba(x_test)
+
+#Get the evaluation metrics
+accuracy = clf.score(x_test, y_test)
+mae = mean_absolute_error(y_test_new, y_pred_prob)
+conmax = confusion_matrix(y_test,y_pred)
+
 print(classification_report(y_test, y_pred))
+print("Mean Absolute Error:",mae)
+print("Accuracy Score:",accuracy)
+print("Confusion Matrix:\n",conmax)
