@@ -20,7 +20,7 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message
                     datefmt='%m/%d/%Y %H:%M:%S',
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
-path = '/home/s3463699/Desktop/BERT-toxic-classification'
+path = '/home/arjun/PycharmProjects/BERT-toxic-classification'
 BERT_VOCAB= os.path.join(path +'/data/toxic_comments/uncased_L-12_H-768_A-12/vocab.txt')
 BERT_INIT_CHKPNT = os.path.join(path +'/data/toxic_comments/uncased_L-12_H-768_A-12/bert_model.ckpt')
 BERT_CONFIG = os.path.join(path +'/data/toxic_comments/uncased_L-12_H-768_A-12/bert_config.json')
@@ -37,7 +37,7 @@ test = pd.read_csv(os.path.join(path +'/data/toxic_comments/test.csv'))
 
 ID = 'id'
 DATA_COLUMN = 'comment_text'
-LABEL_COLUMNS = ['toxic','severe_toxic','obscene','threat','insult','identity_hate']
+LABEL_COLUMNS = ['toxic','obscene','insult']
 
 class InputExample(object):
     """A single training/test example for simple sequence classification."""
@@ -75,13 +75,15 @@ class InputFeatures(object):
 def create_examples(df, labels_available=True):
     """Creates examples for the training and dev sets."""
     examples = []
+
+
     for (i, row) in enumerate(df.values):
         guid = row[0]
         text_a = row[1]
         if labels_available:
-            labels = row[2:7]
+            labels = row[2:5]
         else:
-            labels = [0,0,0,0,0]
+            labels = [0,0,0]
         examples.append(
             InputExample(guid=guid, text_a=text_a, labels=labels))
     return examples
@@ -128,33 +130,12 @@ def convert_examples_to_features(examples, max_seq_length, tokenizer):
         tokens_b = None
         if example.text_b:
             tokens_b = tokenizer.tokenize(example.text_b)
-            # Modifies `tokens_a` and `tokens_b` in place so that the total
-            # length is less than the specified length.
-            # Account for [CLS], [SEP], [SEP] with "- 3"
+
             _truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
         else:
             # Account for [CLS] and [SEP] with "- 2"
             if len(tokens_a) > max_seq_length - 2:
                 tokens_a = tokens_a[:(max_seq_length - 2)]
-
-        # The convention in BERT is:
-        # (a) For sequence pairs:
-        #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
-        #  type_ids: 0   0  0    0    0     0       0 0    1  1  1  1   1 1
-        # (b) For single sequences:
-        #  tokens:   [CLS] the dog is hairy . [SEP]
-        #  type_ids: 0   0   0   0  0     0 0
-        #
-        # Where "type_ids" are used to indicate whether this is the first
-        # sequence or the second sequence. The embedding vectors for `type=0` and
-        # `type=1` were learned during pre-training and are added to the wordpiece
-        # embedding vector (and position vector). This is not *strictly* necessary
-        # since the [SEP] token unambigiously separates the sequences, but it makes
-        # it easier for the model to learn the concept of sequences.
-        #
-        # For classification tasks, the first vector (corresponding to [CLS]) is
-        # used as as the "sentence vector". Note that this only makes sense because
-        # the entire model is fine-tuned.
         tokens = ["[CLS]"] + tokens_a + ["[SEP]"]
         segment_ids = [0] * len(tokens)
 
@@ -244,13 +225,7 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
         per_example_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
         loss = tf.reduce_mean(per_example_loss)
 
-        # probabilities = tf.nn.softmax(logits, axis=-1)
-        # log_probs = tf.nn.log_softmax(logits, axis=-1)
-        #
-        # one_hot_labels = tf.one_hot(labels, depth=num_labels, dtype=tf.float32)
-        #
-        # per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)
-        # loss = tf.reduce_mean(per_example_loss)
+
 
         return (loss, per_example_loss, logits, probabilities)
 
@@ -263,9 +238,6 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
     def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
         """The `model_fn` for TPUEstimator."""
 
-        # tf.logging.info("*** Features ***")
-        # for name in sorted(features.keys()):
-        #    tf.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
 
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
@@ -332,15 +304,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                 eval_dict['eval_loss'] = tf.metrics.mean(values=per_example_loss)
                 return eval_dict
 
-                ## original eval metrics
-                # predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
-                # accuracy = tf.metrics.accuracy(
-                #     labels=label_ids, predictions=predictions, weights=is_real_example)
-                # loss = tf.metrics.mean(values=per_example_loss, weights=is_real_example)
-                # return {
-                #     "eval_accuracy": accuracy,
-                #     "eval_loss": loss,
-                # }
+
 
             eval_metrics = metric_fn(per_example_loss, label_ids, probabilities, is_real_example)
             output_spec = tf.estimator.EstimatorSpec(
@@ -412,27 +376,11 @@ def input_fn_builder(features, seq_length, is_training, drop_remainder):
 
   return input_fn
 
-# class PaddingInputExample(object):
-#     """Fake example so the num input examples is a multiple of the batch size.
-#     When running eval/predict on the TPU, we need to pad the number of examples
-#     to be a multiple of the batch size, because the TPU requires a fixed batch
-#     size. The alternative is to drop the last batch, which is bad because it means
-#     the entire output data won't be generated.
-#     We use this class instead of `None` because treating `None` as padding
-#     battches could cause silent errors.
-#     """
 
 def convert_single_example(ex_index, example, max_seq_length,
                            tokenizer):
     """Converts a single `InputExample` into a single `InputFeatures`."""
 
-    # if isinstance(example, PaddingInputExample):
-    # return InputFeatures(
-    #     input_ids=[0] * max_seq_length,
-    #     input_mask=[0] * max_seq_length,
-    #     segment_ids=[0] * max_seq_length,
-    #     label_ids=0,
-    #     is_real_example=False)
 
     tokens_a = tokenizer.tokenize(example.text_a)
     tokens_b = None
@@ -440,33 +388,14 @@ def convert_single_example(ex_index, example, max_seq_length,
         tokens_b = tokenizer.tokenize(example.text_b)
 
     if tokens_b:
-        # Modifies `tokens_a` and `tokens_b` in place so that the total
-        # length is less than the specified length.
-        # Account for [CLS], [SEP], [SEP] with "- 3"
+
         _truncate_seq_pair(tokens_a, tokens_b, max_seq_length - 3)
     else:
         # Account for [CLS] and [SEP] with "- 2"
         if len(tokens_a) > max_seq_length - 2:
             tokens_a = tokens_a[0:(max_seq_length - 2)]
 
-    # The convention in BERT is:
-    # (a) For sequence pairs:
-    #  tokens:   [CLS] is this jack ##son ##ville ? [SEP] no it is not . [SEP]
-    #  type_ids: 0     0  0    0    0     0       0 0     1  1  1  1   1 1
-    # (b) For single sequences:
-    #  tokens:   [CLS] the dog is hairy . [SEP]
-    #  type_ids: 0     0   0   0  0     0 0
-    #
-    # Where "type_ids" are used to indicate whether this is the first
-    # sequence or the second sequence. The embedding vectors for `type=0` and
-    # `type=1` were learned during pre-training and are added to the wordpiece
-    # embedding vector (and position vector). This is not *strictly* necessary
-    # since the [SEP] token unambiguously separates the sequences, but it makes
-    # it easier for the model to learn the concept of sequences.
-    #
-    # For classification tasks, the first vector (corresponding to [CLS]) is
-    # used as the "sentence vector". Note that this only makes sense because
-    # the entire model is fine-tuned.
+
     tokens = []
     segment_ids = []
     tokens.append("[CLS]")
@@ -486,8 +415,7 @@ def convert_single_example(ex_index, example, max_seq_length,
 
     input_ids = tokenizer.convert_tokens_to_ids(tokens)
 
-    # The mask has 1 for real tokens and 0 for padding tokens. Only real
-    # tokens are attended to.
+
     input_mask = [1] * len(input_ids)
 
     # Zero-pad up to the sequence length.
@@ -521,8 +449,7 @@ def file_based_convert_examples_to_features(
     writer = tf.python_io.TFRecordWriter(output_file)
 
     for (ex_index, example) in enumerate(examples):
-        #if ex_index % 10000 == 0:
-            #tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
+
 
         feature = convert_single_example(ex_index, example,
                                          max_seq_length, tokenizer)
@@ -539,6 +466,7 @@ def file_based_convert_examples_to_features(
             [int(feature.is_real_example)])
         if isinstance(feature.label_ids, list):
             label_ids = feature.label_ids
+            print (label_ids)
         else:
             label_ids = feature.label_ids[0]
         features["label_ids"] = create_int_feature(label_ids)
@@ -556,7 +484,7 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
         "input_ids": tf.FixedLenFeature([seq_length], tf.int64),
         "input_mask": tf.FixedLenFeature([seq_length], tf.int64),
         "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
-        "label_ids": tf.FixedLenFeature([6], tf.int64),
+        "label_ids": tf.FixedLenFeature([3], tf.int64),
         "is_real_example": tf.FixedLenFeature([], tf.int64),
     }
 
@@ -564,8 +492,7 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
         """Decodes a record to a TensorFlow example."""
         example = tf.parse_single_example(record, name_to_features)
 
-        # tf.Example only supports tf.int64, but the TPU only supports tf.int32.
-        # So cast all int64 to int32.
+
         for name in list(example.keys()):
             t = example[name]
             if t.dtype == tf.int64:
@@ -578,8 +505,7 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
         """The actual input function."""
         batch_size = params["batch_size"]
 
-        # For training, we want a lot of parallel reading and shuffling.
-        # For eval, we want no shuffling and parallel reading doesn't matter.
+
         d = tf.data.TFRecordDataset(input_file)
         if is_training:
             d = d.repeat()
@@ -642,6 +568,7 @@ if not os.path.exists(eval_file):
     open(eval_file, 'w').close()
 
 eval_examples = create_examples(x_val)
+
 file_based_convert_examples_to_features(
     eval_examples, MAX_SEQ_LENGTH, tokenizer, eval_file)
 
